@@ -509,6 +509,11 @@ impl CargoInstructions {
         writeln!(self.out, "cargo:rustc-link-arg-bins={val}").unwrap();
     }
 
+    /// Adds `cargo:rustc-link-arg={val}` instruction.
+    fn rustc_link_arg(&mut self, val: &str) {
+        writeln!(self.out, "cargo:rustc-link-arg={val}").unwrap();
+    }
+
     /// Adds `cargo:rustc-link-lib={lib}` instruction.
     fn rustc_link_lib(&mut self, lib: &str) {
         writeln!(self.out, "cargo:rustc-link-lib={lib}").unwrap();
@@ -543,9 +548,17 @@ impl ConanDependencyGraph {
             return;
         };
 
+        let mut shared = false;
+
+        if let Some(Value::Object(options)) = node.get("options") {
+            if let Some(Value::String(is_shared)) = options.get("shared") {
+                shared = is_shared == "True";
+            }
+        }
+
         if let Some(Value::Object(cpp_info)) = node.get("cpp_info") {
             for cpp_comp_name in cpp_info.keys() {
-                Self::visit_cpp_component(cargo, cpp_info, cpp_comp_name);
+                Self::visit_cpp_component(cargo, cpp_info, cpp_comp_name, shared);
             }
         };
 
@@ -563,6 +576,7 @@ impl ConanDependencyGraph {
         cargo: &mut CargoInstructions,
         cpp_info: &Map<String, Value>,
         comp_name: &str,
+        shared: bool,
     ) {
         let Some(component) = Self::find_cpp_component(cpp_info, comp_name) else {
             return;
@@ -585,6 +599,10 @@ impl ConanDependencyGraph {
         for libdir in libdirs {
             if let Value::String(libdir) = libdir {
                 cargo.rustc_link_search(libdir);
+                if shared {
+                    // Add shared libdir to rpath
+                    cargo.rustc_link_arg(&format!("-Wl,-rpath,{}", libdir));
+                }
             }
         }
 
@@ -626,7 +644,7 @@ impl ConanDependencyGraph {
         if let Some(Value::Array(requires)) = component.get("requires") {
             for requirement in requires {
                 if let Value::String(req_comp_name) = requirement {
-                    Self::visit_cpp_component(cargo, cpp_info, req_comp_name);
+                    Self::visit_cpp_component(cargo, cpp_info, req_comp_name, shared);
                 }
             }
         };

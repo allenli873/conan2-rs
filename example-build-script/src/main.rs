@@ -7,9 +7,6 @@ extern "C" {
     /// libxml2
     fn xmlCheckVersion(version: c_int);
 
-    /// libiconv
-    fn iconv_open(tocode: *const u8, fromcode: *const u8) -> *const c_void;
-
     /// libcharset
     fn locale_charset() -> *const u8;
 
@@ -27,9 +24,6 @@ fn main() {
 
         // libxml2
         xmlCheckVersion(2_00_00);
-
-        // libiconv
-        iconv_open(b"a".as_ptr(), b"b".as_ptr());
 
         // libcharset
         locale_charset();
